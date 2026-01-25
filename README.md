@@ -241,12 +241,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Google APIs**: For comprehensive travel data services
 - **OpenAI/Anthropic**: For advanced language model capabilities
 
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/YugmPatel/AetherTrip/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/YugmPatel/AetherTrip/discussions)
-- **Email**: [Contact](mailto:your-email@example.com)
-
 ---
 
 **Made with ❤️ by [Yugm Patel](https://github.com/YugmPatel)**

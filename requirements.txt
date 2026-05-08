@@ -1,4 +1,13 @@
+fastapi
+uvicorn
 langgraph
 pydantic
+python-dotenv
 requests
+httpx
+openai
 streamlit
+openrouteservice
+pytest
+pytest-asyncio
+python-dateutil

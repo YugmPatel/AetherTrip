@@ -1,248 +1,210 @@
-# 🌌 AetherTrip
+# AetherTrip
 
-**Travel, Redesigned by Intelligence.**
+Travel planning with verification built in.
 
-AetherTrip is an AI-powered trip planning application that leverages multi-agent systems to create personalized travel itineraries. Using LangGraph and advanced AI agents, it intelligently researches destinations, finds optimal flights and accommodations, checks weather conditions, and crafts detailed day-by-day travel plans.
+AetherTrip is an AI-powered trip planner that turns a natural-language request into a grounded itinerary. The backend gathers real place, route, weather, knowledge, and image data; validates the plan against practical constraints; repairs obvious conflicts; and returns a feasibility score with transparent warnings. The frontend is a Next.js app for planning, reviewing, saving, and revisiting trips.
 
-## ✨ Features
+## Current Highlights
 
-- **🤖 Multi-Agent Architecture**: Specialized AI agents for different aspects of trip planning
-- **🌍 Smart City Selection**: Intelligent destination matching based on your preferences
-- **✈️ Flight Integration**: Real-time flight search and optimization
-- **🏨 Hotel Recommendations**: Curated accommodation suggestions
-- **🌤️ Weather Intelligence**: Live weather data integration for better planning
-- **📅 Dynamic Itineraries**: Day-by-day personalized travel plans
-- **💰 Cost Estimation**: Transparent budget breakdown and optimization
-- **🎨 Beautiful UI**: Modern Streamlit interface with glassmorphism design
+- Natural-language trip requests with structured constraint extraction.
+- Streaming planning progress from the backend so users can see each agent stage run.
+- Grounded data from Geoapify Places and geocoding, OpenRouteService routing, Open-Meteo weather, and Wikidata/Wikipedia/Wikimedia enrichment.
+- Day-by-day itinerary generation with place metadata, maps, images, budget estimates, validation notes, and source confidence.
+- Validation layers for opening hours, route timing, budget, weather risk, source confidence, and user constraints.
+- Auto-repair loop for fixable itinerary issues before the final plan is returned.
+- Feasibility score, budget breakdown, validation warnings, repair history, and "why this trip works" explanation.
+- Supabase-backed authentication, profiles, and saved trip history.
+- Modern Next.js + TypeScript + Tailwind frontend with landing, planning, result, history, profile, auth, and static information pages.
 
-## 🚀 Quick Start
+## Architecture
 
-### Prerequisites
-
-- Python 3.8+
-- Google API Key (for various services)
-
-### Installation
-
-1. **Clone the repository**
-
-   ```bash
-   git clone https://github.com/YugmPatel/AetherTrip.git
-   cd AetherTrip
-   ```
-
-2. **Install dependencies**
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Set up environment variables**
-
-   ```bash
-   # Create a .env file in the root directory
-   echo 'GOOGLE_API_KEY="your_google_api_key_here"' > .env
-   ```
-
-4. **Run the application**
-
-   **Option A: Streamlit Web Interface (Recommended)**
-
-   ```bash
-   streamlit run frontend/app.py
-   ```
-
-   **Option B: Command Line Interface**
-
-   ```bash
-   python backend/main.py
-   ```
-
-## 🏗️ Architecture
-
-AetherTrip uses a sophisticated multi-agent architecture built with LangGraph:
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   City Agent    │    │  Weather Agent  │    │  Flight Agent   │
-│                 │    │                 │    │                 │
-│ • Destination   │    │ • Live Weather  │    │ • Flight Search │
-│   Research      │    │ • Forecasting   │    │ • Price Comp.   │
-│ • Matching      │    │ • Conditions    │    │ • Optimization  │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         └───────────────────────┼───────────────────────┘
-                                 │
-                    ┌─────────────────┐
-                    │ Orchestrator    │
-                    │                 │
-                    │ • State Mgmt    │
-                    │ • Flow Control  │
-                    │ • Integration   │
-                    └─────────────────┘
-                                 │
-         ┌───────────────────────┼───────────────────────┐
-         │                       │                       │
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Hotel Agent   │    │Itinerary Agent  │    │   Cost Agent    │
-│                 │    │                 │    │                 │
-│ • Accommodation │    │ • Day Planning  │    │ • Budget Calc   │
-│ • Reviews       │    │ • Activities    │    │ • Optimization  │
-│ • Booking       │    │ • Scheduling    │    │ • Breakdown     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+```text
+User request
+  -> FastAPI API
+  -> LangGraph workflow
+     -> InputAnalyzerAgent
+     -> ConstraintExtractorAgent
+     -> GroundingDataFetcher
+        -> Geoapify geocoding and places
+        -> OpenRouteService route matrix
+        -> Open-Meteo weather
+        -> Wikidata/Wikipedia/Wikimedia enrichment
+     -> ItineraryBuilderAgent
+     -> Validators
+        -> opening hours
+        -> route time
+        -> budget
+        -> weather
+        -> constraints/source confidence
+     -> RepairAgent when critical issues are fixable
+     -> FeasibilityScorer
+     -> ExplanationAgent
+  -> Next.js result experience
 ```
 
-### Key Components
+## Tech Stack
 
-- **`backend/graph.py`**: LangGraph workflow orchestration
-- **`backend/agents.py`**: Individual AI agent implementations
-- **`backend/state.py`**: Shared state management
-- **`backend/apis.py`**: External API integrations
-- **`frontend/app.py`**: Streamlit web interface
-- **`backend/cache.py`**: Intelligent caching system
+- Backend: FastAPI, LangGraph, Pydantic, OpenAI-compatible OpenRouter client, Ollama fallback, httpx.
+- Frontend: Next.js 14, React, TypeScript, Tailwind CSS, Framer Motion, MapLibre-ready maps.
+- Data and auth: Supabase auth, profiles, and trip history tables.
+- External services: Geoapify, OpenRouteService, Open-Meteo, Wikidata, Wikipedia, Wikimedia Commons.
 
-## 📁 Project Structure
+## Project Structure
 
-```
+```text
 AetherTrip/
-├── backend/
-│   ├── __init__.py
-│   ├── main.py          # CLI entry point
-│   ├── graph.py         # LangGraph workflow
-│   ├── agents.py        # AI agent implementations
-│   ├── state.py         # State management
-│   ├── apis.py          # API wrappers
-│   ├── cache.py         # Caching system
-│   └── utils.py         # Utility functions
-├── frontend/
-│   └── app.py           # Streamlit web app
-├── database/
-│   ├── cities.json      # City database
-│   ├── cache.json       # API cache
-│   └── schema.md        # Data schemas
-├── docs/
-│   ├── setup_guide.md   # Detailed setup
-│   ├── architecture.md  # Technical docs
-│   ├── api_usage.md     # API documentation
-│   └── roadmap.md       # Future plans
-├── tests/
-│   ├── test_agents.py
-│   ├── test_graph.py
-│   ├── test_api_wrappers.py
-│   └── test_end_to_end.py
-├── requirements.txt
-├── .env                 # Environment variables (create this)
-├── .gitignore
-└── README.md
+  backend/
+    agents/              # Input analysis, constraints, itinerary, repair, explanation
+    schemas/             # Pydantic request/response and domain models
+    scoring/             # Feasibility scoring
+    services/            # LLM, places, routing, weather, images, cache, budget
+    validators/          # Budget, opening hours, route, weather, constraints
+    graph.py             # LangGraph workflow
+    main.py              # FastAPI app and API endpoints
+    state.py             # Shared workflow state
+  frontend/
+    app/                 # Next.js routes
+    components/          # UI components for planning and trip results
+    lib/                 # API, auth, Supabase, storage, maps, normalization helpers
+    package.json
+  supabase/
+    schema.sql           # Profiles/trips tables and RLS policies
+  scripts/               # Debug helpers for itinerary generation
+  tests/                 # Backend and frontend-adjacent regression tests
+  requirements.txt
 ```
 
-## 🔧 Configuration
+## Prerequisites
 
-### Environment Variables
+- Python 3.10+
+- Node.js 18+
+- npm
+- API keys for the services you want to run against live data
+- Supabase project for auth and saved trip history
 
-Create a `.env` file with the following variables:
+## Backend Setup
+
+Install Python dependencies from the repo root:
+
+```bash
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+Create a root `.env` file:
 
 ```env
-# Required
-GOOGLE_API_KEY="your_google_api_key_here"
+OPENROUTER_API_KEY=your_openrouter_key
+OPENROUTER_MODEL=openai/gpt-4-turbo
 
-# Optional (for enhanced features)
-OPENAI_API_KEY="your_openai_key"
-ANTHROPIC_API_KEY="your_anthropic_key"
+GEOAPIFY_API_KEY=your_geoapify_key
+OPENROUTESERVICE_API_KEY=your_openrouteservice_key
+WIKIMEDIA_USER_AGENT=AetherTrip/1.0 (you@example.com)
+
+# Optional local fallback
+OLLAMA_BASE_URL=http://localhost:11434/v1
+OLLAMA_MODEL=qwen2.5:7b
+
+# Optional tuning
+CACHE_TTL_HOURS=24
+MAX_REPAIR_ATTEMPTS=3
+BUDGET_EMERGENCY_BUFFER_PERCENT=0.05
 ```
 
-### API Keys Setup
-
-1. **Google API Key**: Required for Maps, Places, and other Google services
-   - Visit [Google Cloud Console](https://console.cloud.google.com/)
-   - Enable required APIs (Maps, Places, etc.)
-   - Create credentials and copy the API key
-
-2. **Additional APIs**: Check `docs/api_usage.md` for detailed API setup instructions
-
-## 🎯 Usage Examples
-
-### Web Interface
-
-1. Start the Streamlit app: `streamlit run frontend/app.py`
-2. Enter your trip request: "Plan a 5-day trip to Japan in spring"
-3. Watch the AI agents work their magic
-4. Review your personalized itinerary and cost breakdown
-
-### Command Line
+Run the API:
 
 ```bash
-python backend/main.py
-# Enter: "Plan a romantic weekend in Paris"
+python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Programmatic Usage
-
-```python
-from backend.state import TripState
-from backend.graph import AetherTripGraph
-
-# Initialize
-state = TripState(user_input="Plan a 3-day adventure in Iceland")
-graph = AetherTripGraph().compile()
-
-# Execute
-result = graph.invoke(state)
-print(result['itinerary']['plan'])
-```
-
-## 🧪 Testing
-
-Run the test suite:
+Check health:
 
 ```bash
-# Run all tests
-python -m pytest tests/
-
-# Run specific test categories
-python -m pytest tests/test_agents.py -v
-python -m pytest tests/test_graph.py -v
+curl http://localhost:8000/api/health
 ```
 
-## 🤝 Contributing
+## Frontend Setup
 
-We welcome contributions! Please see our contributing guidelines:
+Install frontend dependencies:
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
+```bash
+cd frontend
+npm install
+```
 
-## 📚 Documentation
+Create `frontend/.env.local` from the example:
 
-- **[Setup Guide](docs/setup_guide.md)**: Detailed installation and configuration
-- **[Architecture](docs/architecture.md)**: Technical deep-dive
-- **[API Usage](docs/api_usage.md)**: API integration details
-- **[Roadmap](docs/roadmap.md)**: Future development plans
+```bash
+copy .env.local.example .env.local
+```
 
-## 🛣️ Roadmap
+Fill in:
 
-- [ ] **Multi-language Support**: Expand to support multiple languages
-- [ ] **Real-time Booking**: Direct integration with booking platforms
-- [ ] **Social Features**: Trip sharing and collaboration
-- [ ] **Mobile App**: Native mobile applications
-- [ ] **Advanced AI**: Enhanced personalization and learning
-- [ ] **Offline Mode**: Cached operation capabilities
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_MAP_PROVIDER=geoapify
+NEXT_PUBLIC_MAP_RENDERER=maplibre
+NEXT_PUBLIC_GEOAPIFY_API_KEY=your_geoapify_key
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_LINKEDIN_URL=
+NEXT_PUBLIC_GITHUB_REPO_URL=https://github.com/YugmPatel/AetherTrip
+```
 
-## 📄 License
+Run the app:
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+```bash
+npm run dev
+```
 
-## 🙏 Acknowledgments
+Open `http://localhost:3000`.
 
-- **LangGraph**: For the powerful agent orchestration framework
-- **Streamlit**: For the beautiful and intuitive web interface
-- **Google APIs**: For comprehensive travel data services
-- **OpenAI/Anthropic**: For advanced language model capabilities
+## Supabase Setup
 
----
+1. Create a Supabase project.
+2. Enable the auth providers you want to use. The app includes email OTP and Google OAuth flows.
+3. Add `http://localhost:3000/auth/callback` as a local redirect URL.
+4. Run `supabase/schema.sql` in the Supabase SQL Editor.
+5. If the REST API reports a schema cache issue, run:
 
-**Made with ❤️ by [Yugm Patel](https://github.com/YugmPatel)**
+```sql
+notify pgrst, 'reload schema';
+```
 
-_AetherTrip - Where AI meets wanderlust_ ✈️🌍
+The schema creates `profiles` and `trips` tables with row-level security so users can only access their own saved data.
+
+## API Endpoints
+
+- `GET /api/health` - backend health check.
+- `POST /api/trips/plan` - create a trip plan and return the final response.
+- `POST /api/trips/plan/stream` - stream pipeline events with the final trip response.
+- `GET /api/trips/{trip_id}` - fetch a trip from the backend's in-memory store.
+
+The main trip response includes parsed constraints, itinerary days, place candidates, budget report, validation reports, repair history, feasibility score, service status, warnings, and errors.
+
+## Testing
+
+Run backend tests from the repo root:
+
+```bash
+python -m pytest tests
+```
+
+Run frontend checks from `frontend/`:
+
+```bash
+npm run build
+npm run lint
+```
+
+## Development Notes
+
+- The backend stores generated trips in memory for direct API retrieval. Signed-in users save persistent history through Supabase from the frontend.
+- The planner validates available data at generation time, but it cannot guarantee future opening hours, prices, availability, closures, weather, routes, or booking inventory.
+- Missing API keys will cause some grounding services to fail or skip; the response includes service status and warnings so failures are visible.
+- `.cache/` and `logs/` are local runtime directories and are intentionally ignored.
+
+## Repository
+
+GitHub: https://github.com/YugmPatel/AetherTrip

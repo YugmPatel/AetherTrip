@@ -1,36 +1,47 @@
 # AetherTrip Frontend
 
-Next.js + TypeScript + Tailwind CSS + shadcn/ui frontend for the AetherTrip AI travel planning engine.
+Next.js + TypeScript + Tailwind frontend for the AetherTrip verification-first travel planning engine.
+
+## What It Includes
+
+- Landing page that explains the verification engine.
+- `/plan` trip request flow with streaming agent progress.
+- Trip result pages with itinerary timeline, map, place details, budget, validation warnings, source confidence, repair history, and feasibility scoring.
+- Supabase auth with login, signup, callback handling, profile, and saved trip history.
+- Static information pages for about, how it works, verification engine, accuracy disclaimer, privacy, and terms.
 
 ## Setup
 
 ```bash
 cd frontend
 npm install
+copy .env.local.example .env.local
 ```
 
+Configure `frontend/.env.local`:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_MAP_PROVIDER=geoapify
+NEXT_PUBLIC_MAP_RENDERER=maplibre
+NEXT_PUBLIC_GEOAPIFY_API_KEY=your_geoapify_key
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_LINKEDIN_URL=
+NEXT_PUBLIC_GITHUB_REPO_URL=https://github.com/YugmPatel/AetherTrip
+```
+
+Do not hardcode API or map keys in source code. Restart the Next.js dev server after changing `NEXT_PUBLIC_*` values; Next reads them at startup.
+
 ## Development
+
+Start the backend first on `http://localhost:8000`, then run:
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-The frontend will connect to the backend API running on `http://localhost:8000`.
-
-## Environment
-
-Create `frontend/.env.local` with:
-
-```bash
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-NEXT_PUBLIC_MAP_PROVIDER=geoapify
-NEXT_PUBLIC_MAP_RENDERER=maplibre
-NEXT_PUBLIC_GEOAPIFY_API_KEY=<geoapify_key>
-```
-
-Do not hardcode map keys in source code. Restart the Next.js dev server after changing `.env.local`; Next reads `NEXT_PUBLIC_*` values at startup.
+Open `http://localhost:3000`.
 
 ## Build
 
@@ -39,36 +50,38 @@ npm run build
 npm start
 ```
 
-## Key Features
-
-- **Landing Page**: Hero section with "Plan a trip" CTA, feature highlights
-- **Define Your Journey**: Form-based trip input with constraints
-- **Trip Results**: Itinerary display with feasibility score, budget breakdown
-- **Real-time Verification**: Shows opening hours, travel times, budget accuracy
-
-## Architecture
-
-- **Framework**: Next.js 14 with TypeScript
-- **Styling**: Tailwind CSS + custom components
-- **Animation**: Framer Motion
-- **HTTP Client**: Axios
-- **Maps**: MapLibre GL JS (ready for integration)
-
 ## API Integration
 
-The frontend connects to the backend `POST /api/trips/plan` endpoint:
+The planning page uses the streaming endpoint first:
 
-```typescript
-POST http://localhost:8000/api/trips/plan
+```http
+POST http://localhost:8000/api/trips/plan/stream
 Content-Type: application/json
+Accept: text/event-stream
 
 {
-  "user_input": "Plan a 3-day LA trip from San Jose for 4 friends under $400 each..."
+  "user_input": "Plan a 3-day LA trip from San Jose for 4 friends under $400 each"
 }
 ```
 
-Response includes trip_id, itinerary, budget_report, feasibility_score, etc.
+If streaming is unavailable, the frontend falls back to:
 
-## Supabase Schema
+```http
+POST http://localhost:8000/api/trips/plan
+```
 
-Run `../supabase/schema.sql` in the Supabase SQL Editor before testing saved trip history. After creating or updating tables, run `notify pgrst, 'reload schema';` or refresh/restart the project if the REST API says a table is missing from the schema cache.
+Trip result pages can also fetch:
+
+```http
+GET http://localhost:8000/api/trips/{trip_id}
+```
+
+## Supabase
+
+Run `../supabase/schema.sql` in the Supabase SQL Editor before testing saved trip history. If Supabase reports a schema cache error after creating or updating tables, run:
+
+```sql
+notify pgrst, 'reload schema';
+```
+
+The frontend expects Supabase public URL and anon key values for auth-aware pages and saved history.

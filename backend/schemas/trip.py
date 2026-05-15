@@ -3,11 +3,12 @@ Trip request/response schemas for API endpoints.
 """
 
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from .constraints import TripConstraints
 from .itinerary import Itinerary
+from .places import PlaceCandidate
 from .budget import BudgetBreakdown
 from .validation import ValidationReport
 from .scoring import FeasibilityScore
@@ -51,6 +52,18 @@ class TripResponse(BaseModel):
         description="History of repairs applied"
     )
     feasibility_score: Optional[FeasibilityScore] = Field(None, description="Feasibility score and breakdown")
+    place_candidates: List[PlaceCandidate] = Field(
+        default_factory=list,
+        description="Verified place candidates used for coordinates/source details"
+    )
+    service_status: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Non-sensitive external service status summary"
+    )
+    data_sources: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Alias for service_status for frontend display"
+    )
     
     # Explanations
     why_this_trip_works: Optional[str] = Field(

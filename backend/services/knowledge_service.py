@@ -24,6 +24,12 @@ class KnowledgeService:
         self.wikidata_base_url = config.WIKIDATA_BASE_URL
         self.wikipedia_base_url = config.WIKIPEDIA_BASE_URL
         self.user_agent = config.WIKIMEDIA_USER_AGENT
+        self.last_status: Dict[str, Any] = {
+            "provider": "wikidata_wikipedia",
+            "status": "not_started",
+            "used_fallback": False,
+            "count": 0,
+        }
     
     def get_place_summary(self, place_name: str) -> Optional[str]:
         """
@@ -39,10 +45,17 @@ class KnowledgeService:
         cached = self.cache_service.get(cache_key)
         
         if cached:
-            logger.info(f"Wiki summary cache hit for {place_name}")
+            logger.info(
+                "Wikidata/Wikipedia enrichment succeeded provider=wikidata_wikipedia endpoint_type=wikipedia_summary destination=%s count=1 fallback_used=false cache_hit=true",
+                place_name,
+            )
             return cached
         
         try:
+            logger.info(
+                "Wikidata/Wikipedia enrichment started provider=wikidata_wikipedia endpoint_type=wikipedia_summary destination=%s fallback_used=false",
+                place_name,
+            )
             params = {
                 "action": "query",
                 "titles": place_name,
@@ -72,15 +85,24 @@ class KnowledgeService:
                     
                     # Cache result
                     self.cache_service.set(cache_key, summary)
-                    logger.info(f"Wiki summary retrieved for {place_name}")
+                    logger.info(
+                        "Wikidata/Wikipedia enrichment succeeded provider=wikidata_wikipedia endpoint_type=wikipedia_summary destination=%s count=1 fallback_used=false",
+                        place_name,
+                    )
                     
                     return summary
             
-            logger.warning(f"No Wikipedia summary found for {place_name}")
+            logger.warning(
+                "Wikidata/Wikipedia enrichment succeeded provider=wikidata_wikipedia endpoint_type=wikipedia_summary destination=%s count=0 fallback_used=false",
+                place_name,
+            )
             return None
         
         except Exception as e:
-            logger.error(f"Wikipedia fetch failed: {e}")
+            logger.error(
+                "Wikidata/Wikipedia enrichment failed provider=wikidata_wikipedia endpoint_type=wikipedia_summary destination=%s count=0 fallback_used=false",
+                place_name,
+            )
             return None
     
     def get_wikidata_facts(self, place_name: str) -> Dict[str, Any]:
@@ -97,10 +119,17 @@ class KnowledgeService:
         cached = self.cache_service.get(cache_key)
         
         if cached:
-            logger.info(f"Wikidata facts cache hit for {place_name}")
+            logger.info(
+                "Wikidata/Wikipedia enrichment succeeded provider=wikidata_wikipedia endpoint_type=wikidata_facts destination=%s count=1 fallback_used=false cache_hit=true",
+                place_name,
+            )
             return cached
         
         try:
+            logger.info(
+                "Wikidata/Wikipedia enrichment started provider=wikidata_wikipedia endpoint_type=wikidata_facts destination=%s fallback_used=false",
+                place_name,
+            )
             params = {
                 "action": "wbsearchentities",
                 "search": place_name,
@@ -122,7 +151,10 @@ class KnowledgeService:
             
             results = data.get("search", [])
             if not results:
-                logger.warning(f"No Wikidata results for {place_name}")
+                logger.warning(
+                    "Wikidata/Wikipedia enrichment succeeded provider=wikidata_wikipedia endpoint_type=wikidata_facts destination=%s count=0 fallback_used=false",
+                    place_name,
+                )
                 return {}
             
             # Get first result
@@ -135,12 +167,19 @@ class KnowledgeService:
             
             # Cache result
             self.cache_service.set(cache_key, entity_data)
-            logger.info(f"Wikidata facts retrieved for {place_name}")
+            logger.info(
+                "Wikidata/Wikipedia enrichment succeeded provider=wikidata_wikipedia endpoint_type=wikidata_facts destination=%s count=%s fallback_used=false",
+                place_name,
+                1 if entity_data else 0,
+            )
             
             return entity_data
         
         except Exception as e:
-            logger.error(f"Wikidata fetch failed: {e}")
+            logger.error(
+                "Wikidata/Wikipedia enrichment failed provider=wikidata_wikipedia endpoint_type=wikidata_facts destination=%s count=0 fallback_used=false",
+                place_name,
+            )
             return {}
     
     def _get_entity_details(self, entity_id: str) -> Dict[str, Any]:
@@ -221,7 +260,18 @@ class KnowledgeService:
         cached = self.cache_service.get(cache_key)
         
         if cached:
-            logger.info(f"Enriched place cache hit for {place_name}")
+            logger.info(
+                "Wikidata/Wikipedia enrichment succeeded provider=wikidata_wikipedia endpoint_type=enrichment destination=%s count=1 fallback_used=false cache_hit=true",
+                place_name,
+            )
+            self.last_status = {
+                "provider": "wikidata_wikipedia",
+                "status": "success",
+                "destination": place_name,
+                "count": 1,
+                "used_fallback": False,
+                "cache_hit": True,
+            }
             return cached
         
         result = {
@@ -232,5 +282,12 @@ class KnowledgeService:
         
         # Cache result
         self.cache_service.set(cache_key, result)
+        self.last_status = {
+            "provider": "wikidata_wikipedia",
+            "status": "success" if result.get("summary") or result.get("facts") else "skipped",
+            "destination": place_name,
+            "count": 1 if result.get("summary") or result.get("facts") else 0,
+            "used_fallback": False,
+        }
         
         return result

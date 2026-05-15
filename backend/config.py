@@ -18,7 +18,7 @@ class Config:
     # ===== LLM Services =====
     # OpenRouter (Primary)
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-    OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+    OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4-turbo")
     
     # Ollama (Fallback)
@@ -27,17 +27,17 @@ class Config:
     
     # ===== Routing =====
     OPENROUTESERVICE_API_KEY = os.getenv("OPENROUTESERVICE_API_KEY", "")
-    OPENROUTESERVICE_BASE_URL = "https://api.openrouteservice.org"
+    OPENROUTESERVICE_BASE_URL = os.getenv("OPENROUTESERVICE_BASE_URL", "https://api.openrouteservice.org")
     
     # ===== Places & Geocoding =====
     GEOAPIFY_API_KEY = os.getenv("GEOAPIFY_API_KEY", "")
-    GEOAPIFY_BASE_URL = "https://api.geoapify.com"
+    GEOAPIFY_BASE_URL = os.getenv("GEOAPIFY_BASE_URL", "https://api.geoapify.com/v1")
     
     # ===== Weather =====
     OPEN_METEO_BASE_URL = os.getenv("OPEN_METEO_BASE_URL", "https://api.open-meteo.com/v1/forecast")
     
     # ===== Knowledge Enrichment =====
-    WIKIMEDIA_USER_AGENT = os.getenv("WIKIMEDIA_USER_AGENT", "AetherTrip/2.0")
+    WIKIMEDIA_USER_AGENT = os.getenv("WIKIMEDIA_USER_AGENT", "AetherTrip/1.0 (your-email@example.com)")
     WIKIDATA_BASE_URL = "https://www.wikidata.org/w/api.php"
     WIKIPEDIA_BASE_URL = "https://en.wikipedia.org/w/api.php"
     
@@ -62,7 +62,7 @@ class Config:
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
     
     # ===== Paths =====
-    PROJECT_ROOT = Path(__file__).parent.parent.parent
+    PROJECT_ROOT = Path(__file__).parent.parent
     CACHE_DIR = PROJECT_ROOT / ".cache"
     LOGS_DIR = PROJECT_ROOT / "logs"
     

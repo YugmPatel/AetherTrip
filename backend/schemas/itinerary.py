@@ -31,6 +31,14 @@ class ItineraryItem(BaseModel):
         le=1,
         description="Confidence in place data (inherited from PlaceCandidate)"
     )
+    latitude: Optional[float] = Field(None, ge=-90, le=90, description="Place latitude")
+    longitude: Optional[float] = Field(None, ge=-180, le=180, description="Place longitude")
+    address: Optional[str] = Field(None, description="Place address")
+    verification_status: Optional[str] = Field(None, description="Place verification status")
+    image_url: Optional[str] = Field(None, description="Optional image URL copied from the place candidate")
+    image_source: Optional[str] = Field(None, description="Image source: wikimedia, wikipedia, category_placeholder, none")
+    image_credit: Optional[str] = Field(None, description="Image attribution or source credit")
+    image_confidence: Optional[float] = Field(None, ge=0, le=1, description="Confidence that the image matches the place")
     
     notes: Optional[str] = Field(None, description="Additional notes or tips for this activity")
 
@@ -65,6 +73,8 @@ class DayPlan(BaseModel):
     )
     
     day: int = Field(..., ge=1, description="Day number (1-indexed)")
+    day_number: Optional[int] = Field(None, ge=1, description="Day number alias for LLM/frontends")
+    title: Optional[str] = Field(None, description="Short day title")
     date: Optional[str] = Field(None, description="Date in YYYY-MM-DD format (if known)")
     
     items: List[ItineraryItem] = Field(
@@ -101,3 +111,5 @@ class Itinerary(BaseModel):
     )
     
     notes: Optional[str] = Field(None, description="Overall itinerary notes or summary")
+    generation_method: Optional[str] = Field(None, description="How the itinerary was generated")
+    warnings: List[str] = Field(default_factory=list, description="Itinerary generation warnings")

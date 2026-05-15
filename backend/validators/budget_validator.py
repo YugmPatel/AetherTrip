@@ -77,10 +77,39 @@ class BudgetValidator:
         
         total_per_person = total_base + total_hidden
         
-        # Check budget
+        # Check budget. Keep this explicitly boolean; Pydantic must never see None here.
         user_budget = constraints.budget_per_person
-        is_over_budget = user_budget and total_per_person > user_budget
-        budget_remaining = user_budget - total_per_person if user_budget else None
+        has_budget_limit = user_budget is not None
+        is_over_budget = bool(has_budget_limit and total_per_person > user_budget)
+        budget_remaining = user_budget - total_per_person if has_budget_limit else None
+
+        base_costs = {
+            "lodging_base": base_lodging,
+            "intercity_transport": base_intercity,
+            "local_transport": base_local_transport,
+            "food": base_food,
+            "attraction_tickets": base_attractions,
+        }
+        hidden_costs = {
+            "lodging_taxes": lodging_taxes,
+            "lodging_fees": lodging_fees,
+            "booking_fees": booking_fees,
+            "baggage_fees": baggage_fees,
+            "seat_selection": seat_selection,
+            "parking": parking,
+            "tolls": tolls,
+            "tips": tips,
+            "currency_fees": currency_fees,
+            "emergency_buffer": emergency_buffer,
+        }
+        budget_warnings = []
+        if not has_budget_limit:
+            budget_warnings.append("Budget limit missing or cost estimate incomplete.")
+        over_pct = ((total_per_person - user_budget) / user_budget) if has_budget_limit and user_budget else 0
+        far_over_budget = bool(is_over_budget and over_pct > 0.25)
+        if far_over_budget:
+            budget_warnings.append("Trip is not feasible within the requested budget.")
+        status = "unknown" if not has_budget_limit else "over_budget" if is_over_budget else "within_budget"
         
         # Create breakdown
         breakdown = BudgetBreakdown(
@@ -105,9 +134,16 @@ class BudgetValidator:
             total_hidden_costs=total_hidden,
             total_per_person=total_per_person,
             total_for_group=total_per_person * constraints.travelers,
+            total_estimated_cost=total_per_person * constraints.travelers,
+            per_person_cost=total_per_person,
+            budget_limit=user_budget,
+            base_costs=base_costs,
+            hidden_costs=hidden_costs,
             user_budget_per_person=user_budget,
             is_over_budget=is_over_budget,
             budget_remaining_per_person=budget_remaining,
+            status=status,
+            warnings=budget_warnings,
             notes="Hidden costs include taxes, fees, tips, currency conversion, and 5% emergency buffer."
         )
         
@@ -117,18 +153,31 @@ class BudgetValidator:
         
         if is_over_budget:
             overage = total_per_person - user_budget
+            message = (
+                f"Trip is not feasible within the requested budget. "
+                f"Estimated cost ${total_per_person:.2f}/person exceeds budget ${user_budget:.2f}/person by ${overage:.2f}."
+                if far_over_budget
+                else f"Trip cost ${total_per_person:.2f}/person exceeds budget ${user_budget:.2f}/person by ${overage:.2f}."
+            )
             issues.append(ValidationIssue(
                 type="over_budget",
                 severity="critical",
-                message=f"Trip cost ${total_per_person:.2f}/person exceeds budget ${user_budget:.2f}/person by ${overage:.2f}.",
-                suggested_fix=f"Remove activities, find cheaper alternatives, or reduce trip duration.",
+                message=message,
+                suggested_fix="Reduce duration, increase budget, use cheaper lodging, or remove paid activities.",
             ))
-        elif user_budget and total_per_person > user_budget * 0.95:
+        elif has_budget_limit and total_per_person > user_budget * 0.95:
             warnings.append(ValidationIssue(
                 type="budget_tight",
                 severity="warning",
                 message=f"Only ${budget_remaining:.2f}/person remaining after estimated costs.",
                 suggested_fix="Consider adding buffer or removing optional activities."
+            ))
+        elif not has_budget_limit:
+            warnings.append(ValidationIssue(
+                type="budget_unknown",
+                severity="warning",
+                message="Budget limit missing or cost estimate incomplete.",
+                suggested_fix="Add a per-person budget to validate affordability."
             ))
         
         passed = len(issues) == 0
@@ -149,6 +198,8 @@ class BudgetValidator:
     
     def _estimate_intercity_transport(self, constraints: HardConstraints) -> float:
         """Estimate intercity transport. Fallback: $100 if origin != destination."""
+        if not constraints.origin or not constraints.destination:
+            return 0
         if constraints.origin.lower() != constraints.destination.lower():
             return 100
         return 0
@@ -170,7 +221,10 @@ class BudgetValidator:
     
     def _summarize(self, breakdown: BudgetBreakdown) -> str:
         """Generate summary."""
+        if breakdown.status == "unknown":
+            return "Budget status unknown: budget limit missing or cost estimate incomplete."
         if breakdown.is_over_budget:
             return f"OVER BUDGET: ${breakdown.total_per_person:.2f}/person vs ${breakdown.user_budget_per_person:.2f} limit."
-        else:
-            return f"Within budget: ${breakdown.total_per_person:.2f}/person. Remaining: ${breakdown.budget_remaining_per_person:.2f}."
+        remaining = breakdown.budget_remaining_per_person
+        remaining_text = f"${remaining:.2f}" if remaining is not None else "unknown"
+        return f"Within budget: ${breakdown.total_per_person:.2f}/person. Remaining: {remaining_text}."

@@ -22,6 +22,12 @@ class RoutingService:
         self.cache_service = cache_service or CacheService()
         self.base_url = config.OPENROUTESERVICE_BASE_URL
         self.api_key = config.OPENROUTESERVICE_API_KEY
+        self.last_matrix_status: Dict[str, Any] = {
+            "provider": "openrouteservice",
+            "status": "not_started",
+            "used_fallback": False,
+            "count": 0,
+        }
     
     def get_distance_and_time(
         self,
@@ -99,15 +105,50 @@ class RoutingService:
         """
         if len(locations) < 2:
             logger.warning("Need at least 2 locations for matrix")
+            self.last_matrix_status = {
+                "provider": "openrouteservice",
+                "status": "skipped",
+                "count": len(locations),
+                "used_fallback": False,
+                "reason": "not_enough_locations",
+            }
             return {}
         
         cache_key = f"matrix_{profile}_{len(locations)}"
         cached = self.cache_service.get(cache_key)
         if cached:
-            logger.info(f"Route matrix cache hit")
+            logger.info(
+                "OpenRouteService matrix call succeeded provider=openrouteservice endpoint_type=matrix destination=place_candidates count=%s fallback_used=false cache_hit=true",
+                len(locations),
+            )
+            self.last_matrix_status = {
+                "provider": "openrouteservice",
+                "status": "success",
+                "count": len(locations),
+                "used_fallback": False,
+                "cache_hit": True,
+            }
             return cached
+
+        if not self.api_key:
+            logger.warning(
+                "OpenRouteService matrix call failed provider=openrouteservice endpoint_type=matrix destination=place_candidates count=%s fallback_used=true reason=missing_api_key",
+                len(locations),
+            )
+            self.last_matrix_status = {
+                "provider": "openrouteservice",
+                "status": "failed",
+                "count": len(locations),
+                "used_fallback": True,
+                "reason": "missing_api_key",
+            }
+            return self._mock_matrix(locations)
         
         try:
+            logger.info(
+                "OpenRouteService matrix call started provider=openrouteservice endpoint_type=matrix destination=place_candidates count=%s fallback_used=false",
+                len(locations),
+            )
             url = f"{self.base_url}/v2/matrix/{profile}"
             
             # Format locations as [lon, lat] pairs
@@ -139,12 +180,31 @@ class RoutingService:
             
             # Cache result
             self.cache_service.set(cache_key, result)
-            logger.info(f"Route matrix retrieved: {len(locations)} locations")
+            logger.info(
+                "OpenRouteService matrix call succeeded provider=openrouteservice endpoint_type=matrix destination=place_candidates count=%s fallback_used=false",
+                len(locations),
+            )
+            self.last_matrix_status = {
+                "provider": "openrouteservice",
+                "status": "success",
+                "count": len(locations),
+                "used_fallback": False,
+            }
             
             return result
         
         except Exception as e:
-            logger.error(f"Route matrix calculation failed: {e}")
+            logger.error(
+                "OpenRouteService matrix call failed provider=openrouteservice endpoint_type=matrix destination=place_candidates count=%s fallback_used=true",
+                len(locations),
+            )
+            self.last_matrix_status = {
+                "provider": "openrouteservice",
+                "status": "failed",
+                "count": len(locations),
+                "used_fallback": True,
+                "reason": type(e).__name__,
+            }
             return self._mock_matrix(locations)
     
     def get_isochrone(

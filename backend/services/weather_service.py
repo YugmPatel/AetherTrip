@@ -23,6 +23,11 @@ class WeatherService:
         """Initialize weather service with optional caching."""
         self.cache_service = cache_service or CacheService()
         self.base_url = config.OPEN_METEO_BASE_URL
+        self.last_status: Dict[str, Any] = {
+            "provider": "open_meteo",
+            "status": "not_started",
+            "used_fallback": False,
+        }
     
     def get_forecast(
         self,
@@ -45,16 +50,35 @@ class WeatherService:
         cache_key = f"weather_{latitude}_{longitude}_{days}"
         cached = self.cache_service.get(cache_key)
         if cached:
-            logger.info(f"Weather cache hit for {latitude},{longitude}")
+            logger.info(
+                "Open-Meteo weather call succeeded provider=open_meteo endpoint_type=weather destination=%s,%s count=%s fallback_used=false cache_hit=true",
+                latitude,
+                longitude,
+                days,
+            )
+            self.last_status = {
+                "provider": "open_meteo",
+                "status": "success",
+                "destination": f"{latitude},{longitude}",
+                "count": days,
+                "used_fallback": False,
+                "cache_hit": True,
+            }
             return cached
         
         try:
+            logger.info(
+                "Open-Meteo weather call started provider=open_meteo endpoint_type=weather destination=%s,%s count=%s fallback_used=false",
+                latitude,
+                longitude,
+                days,
+            )
             # Query parameters
             params = {
                 "latitude": latitude,
                 "longitude": longitude,
                 "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,weather_code,wind_speed_10m_max",
-                "temperature_unit": "Fahrenheit",
+                "temperature_unit": "fahrenheit",
                 "wind_speed_unit": "mph",
                 "forecast_days": min(days, 16),  # Open-Meteo max is 16 days
             }
@@ -68,7 +92,19 @@ class WeatherService:
             response.raise_for_status()
             
             data = response.json()
-            logger.info(f"Weather forecast retrieved for {latitude},{longitude}")
+            logger.info(
+                "Open-Meteo weather call succeeded provider=open_meteo endpoint_type=weather destination=%s,%s count=%s fallback_used=false",
+                latitude,
+                longitude,
+                len(data.get("daily", {}).get("time", [])) if isinstance(data, dict) else days,
+            )
+            self.last_status = {
+                "provider": "open_meteo",
+                "status": "success",
+                "destination": f"{latitude},{longitude}",
+                "count": len(data.get("daily", {}).get("time", [])) if isinstance(data, dict) else days,
+                "used_fallback": False,
+            }
             
             # Cache result
             self.cache_service.set(cache_key, data)
@@ -76,7 +112,19 @@ class WeatherService:
             return data
         
         except Exception as e:
-            logger.error(f"Weather forecast failed: {e}")
+            logger.error(
+                "Open-Meteo weather call failed provider=open_meteo endpoint_type=weather destination=%s,%s count=0 fallback_used=true",
+                latitude,
+                longitude,
+            )
+            self.last_status = {
+                "provider": "open_meteo",
+                "status": "failed",
+                "destination": f"{latitude},{longitude}",
+                "count": 0,
+                "used_fallback": True,
+                "reason": type(e).__name__,
+            }
             return self._mock_forecast(latitude, longitude, days)
     
     def get_weather_summary(

@@ -73,6 +73,14 @@ class PlaceCandidate(BaseModel):
         default_factory=list,
         description="List of data sources this place came from"
     )
+    source: str = Field(
+        default="unknown",
+        description="Primary provider alias for frontend/debug display"
+    )
+    source_provider: str = Field(
+        default="unknown",
+        description="Primary provider for this place candidate (e.g., geoapify)"
+    )
     verification_status: str = Field(
         default="unverified",
         description="Status: 'unverified', 'verified', 'partially_verified'"
@@ -83,6 +91,21 @@ class PlaceCandidate(BaseModel):
         le=1,
         description="Overall confidence in place data (weighted from sources)"
     )
+    source_confidence: float = Field(
+        default=0.0,
+        ge=0,
+        le=1,
+        description="Alias for source confidence used by frontend/debug tooling"
+    )
+    candidate_rank_score: float = Field(
+        default=0.0,
+        description="Internal ranking score used to prioritize itinerary-quality candidates"
+    )
+    image_url: Optional[str] = Field(None, description="Optional image URL from a trusted image provider")
+    place_image_url: Optional[str] = Field(None, description="Legacy/provider image URL alias, if supplied")
+    image_source: Optional[str] = Field(None, description="Image source: wikimedia, wikipedia, category_placeholder, none")
+    image_credit: Optional[str] = Field(None, description="Image attribution or source credit")
+    image_confidence: Optional[float] = Field(None, ge=0, le=1, description="Confidence that the image matches the place")
     
     description: Optional[str] = Field(None, description="Brief description or summary")
     phone: Optional[str] = Field(None, description="Phone number if available")

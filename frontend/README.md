@@ -19,6 +19,19 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 The frontend will connect to the backend API running on `http://localhost:8000`.
 
+## Environment
+
+Create `frontend/.env.local` with:
+
+```bash
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_MAP_PROVIDER=geoapify
+NEXT_PUBLIC_MAP_RENDERER=maplibre
+NEXT_PUBLIC_GEOAPIFY_API_KEY=<geoapify_key>
+```
+
+Do not hardcode map keys in source code. Restart the Next.js dev server after changing `.env.local`; Next reads `NEXT_PUBLIC_*` values at startup.
+
 ## Build
 
 ```bash
@@ -55,3 +68,7 @@ Content-Type: application/json
 ```
 
 Response includes trip_id, itinerary, budget_report, feasibility_score, etc.
+
+## Supabase Schema
+
+Run `../supabase/schema.sql` in the Supabase SQL Editor before testing saved trip history. After creating or updating tables, run `notify pgrst, 'reload schema';` or refresh/restart the project if the REST API says a table is missing from the schema cache.

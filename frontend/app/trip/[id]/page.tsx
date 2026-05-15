@@ -4,6 +4,10 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import axios from 'axios'
+import { buildWhyTripSections, getCanonicalBudgetStatus, getWhyTripTitle } from '@/lib/resultPage'
+import { TripResponse } from '@/lib/types'
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
 
 interface TripParams {
   params: {
@@ -13,6 +17,13 @@ interface TripParams {
 
 type TripData = {
   trip_id?: string
+  constraints?: {
+    hard?: {
+      destination?: string
+      duration_days?: number | null
+      travelers?: number
+    }
+  }
   itinerary?: {
     destination?: string
     days?: Array<{
@@ -56,7 +67,7 @@ export default function TripResult({ params }: TripParams) {
       try {
         setLoading(true)
         setError('')
-        const response = await axios.get(`http://localhost:8000/api/trips/${params.id}`)
+        const response = await axios.get(`${API_BASE_URL}/api/trips/${params.id}`)
         if (isMounted) {
           setTrip(response.data)
         }
@@ -88,9 +99,16 @@ export default function TripResult({ params }: TripParams) {
     return <div className="flex items-center justify-center min-h-screen">{error || 'Trip not found'}</div>
   }
 
-  const score = trip.feasibility_score || { overall_score: 92, grade: 'A' }
+  const score = trip.feasibility_score
   const itineraryDays = trip.itinerary?.days || []
   const budget = trip.budget_report
+  const budgetStatus = getCanonicalBudgetStatus(budget)
+  const whySections = buildWhyTripSections(trip as TripResponse)
+  const whyTitle = getWhyTripTitle(trip as TripResponse)
+  const destination =
+    trip.constraints?.hard?.destination && trip.constraints.hard.destination !== 'Unknown'
+      ? trip.constraints.hard.destination
+      : trip.itinerary?.destination || 'Trip'
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -102,10 +120,10 @@ export default function TripResult({ params }: TripParams) {
               <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold">A</div>
               <span className="text-xl font-bold text-gray-900">AetherTrip</span>
             </Link>
-            <div className="text-2xl font-bold text-gray-900">{trip.itinerary?.destination || 'Trip'}</div>
+            <div className="text-2xl font-bold text-gray-900">{destination}</div>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/trip/new" className="text-gray-600 hover:text-gray-900">New Trip</Link>
+            <Link href="/plan" className="text-gray-600 hover:text-gray-900">New Trip</Link>
             <button className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Download PDF</button>
           </div>
         </div>
@@ -136,7 +154,7 @@ export default function TripResult({ params }: TripParams) {
               <div className="flex items-center gap-8 mb-6">
                 <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-400 to-cyan-300 flex items-center justify-center shadow-lg">
                   <div className="text-center">
-                    <div className="text-5xl font-bold text-white">{score.overall_score}</div>
+                    <div className="text-5xl font-bold text-white">{score?.overall_score ?? '--'}</div>
                     <div className="text-sm text-blue-100">SCORE</div>
                   </div>
                 </div>
@@ -225,10 +243,19 @@ export default function TripResult({ params }: TripParams) {
               className="bg-white rounded-2xl p-8 border border-gray-200"
             >
               <h3 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <span className="text-blue-500">✓</span> Why This Trip Works
+                <span className="text-blue-500">✓</span> {whyTitle}
               </h3>
-              <div className="space-y-4 text-gray-700 whitespace-pre-line">
-                {trip.why_this_trip_works || 'This itinerary is assembled from validated constraints, local data, and repair logic.'}
+              <div className="space-y-4 text-gray-700">
+                {whySections.map((section) => (
+                  <div key={section.title}>
+                    <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500">{section.title}</h4>
+                    <div className="mt-2 space-y-2">
+                      {section.items.map((item, index) => (
+                        <p key={`${section.title}-${index}`}>{item}</p>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             </motion.div>
           </div>
@@ -260,8 +287,8 @@ export default function TripResult({ params }: TripParams) {
                   <span className="text-blue-600">${budget?.total_per_person || 0}</span>
                 </div>
                 <div className="flex justify-between text-xs text-gray-500">
-                  <span>Within Budget</span>
-                  <span>${budget?.budget_remaining_per_person || 0}</span>
+                  <span>{budgetStatus.label}</span>
+                  <span>${budgetStatus.remaining ?? budget?.budget_remaining_per_person ?? 0}</span>
                 </div>
               </div>
             </div>

@@ -10,7 +10,7 @@ from datetime import date
 class HardConstraints(BaseModel):
     """Non-negotiable trip requirements."""
     
-    origin: str = Field(..., description="Starting city/location")
+    origin: Optional[str] = Field(None, description="Starting city/location")
     destination: str = Field(..., description="Target destination")
     start_date: Optional[date] = Field(None, description="Trip start date (YYYY-MM-DD)")
     end_date: Optional[date] = Field(None, description="Trip end date (YYYY-MM-DD)")
@@ -18,6 +18,7 @@ class HardConstraints(BaseModel):
     
     travelers: int = Field(default=1, ge=1, description="Number of travelers")
     budget_per_person: Optional[float] = Field(None, ge=0, description="Budget per person in specified currency")
+    budget_status: Optional[str] = Field(None, description="Budget status: specified or unknown")
     currency: str = Field(default="USD", description="Currency code")
     
     transport_mode: Literal["car", "public_transit", "walking", "mixed", "no_car"] = Field(
@@ -26,6 +27,8 @@ class HardConstraints(BaseModel):
     )
     
     diet: List[str] = Field(default_factory=list, description="Dietary restrictions (e.g., ['vegetarian', 'gluten-free'])")
+    no_car: bool = Field(default=False, description="Whether the user requested no-car planning")
+    weather_preference: Optional[str] = Field(None, description="Weather preference such as rain_safe")
     must_visit: List[str] = Field(default_factory=list, description="Places/attractions that must be included")
     avoid: List[str] = Field(default_factory=list, description="Places/types to avoid")
     
@@ -42,6 +45,7 @@ class SoftPreferences(BaseModel):
     )
     interests: List[str] = Field(default_factory=list, description="Interest tags (e.g., ['hiking', 'food', 'culture'])")
     trip_style: Optional[str] = Field(None, description="Trip style (e.g., adventure, luxury, budget)")
+    budget_style: Optional[str] = Field(None, description="Budget preference such as budget")
     food_style: Optional[str] = Field(None, description="Food preference (e.g., street food, fine dining)")
     hotel_style: Optional[str] = Field(None, description="Accommodation preference (e.g., luxury, boutique, budget)")
     avoid_crowds: bool = Field(default=False, description="Prefer less touristy spots")

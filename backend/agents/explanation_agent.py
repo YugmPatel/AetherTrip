@@ -25,6 +25,13 @@ class ExplanationAgent:
         feasibility_score = state.feasibility_score or {}
         budget_report = state.budget_report or {}
         itinerary = state.itinerary or {}
+        days = itinerary.get("days", []) if isinstance(itinerary, dict) else []
+        item_count = sum(len(day.get("items", []) or []) for day in days)
+        if not days or item_count == 0:
+            return {
+                "final_explanation": "Why this trip works is unavailable because the itinerary was not generated.",
+                "why_this_trip_works": "Why this trip works is unavailable because the itinerary was not generated.",
+            }
         
         # Build explanation from components
         parts = []
@@ -36,9 +43,8 @@ class ExplanationAgent:
         
         # Itinerary
         if itinerary:
-            days = len(itinerary.get("days", []))
             destination = itinerary.get("destination", "Destination")
-            parts.append(f"\n**Itinerary:** {days}-day trip to {destination}")
+            parts.append(f"\n**Itinerary:** {len(days)}-day trip to {destination}")
         
         # Budget
         if budget_report:
@@ -48,7 +54,10 @@ class ExplanationAgent:
                 parts.append(f"\n⚠️ **Budget Status:** Over budget at ${total:.2f}/person")
             else:
                 remaining = budget_report.get("budget_remaining_per_person", 0)
-                parts.append(f"\n✓ **Budget Status:** ${total:.2f}/person (${remaining:.2f} remaining)")
+                if remaining is None:
+                    parts.append(f"\n**Budget Status:** ${total:.2f}/person estimated; no budget limit provided")
+                else:
+                    parts.append(f"\n**Budget Status:** ${total:.2f}/person (${remaining:.2f} remaining)")
         
         # Warnings
         warnings = feasibility_score.get("warnings", [])
@@ -66,4 +75,4 @@ class ExplanationAgent:
         
         logger.info(f"Explanation generated ({len(final_explanation)} chars)")
         
-        return {"final_explanation": final_explanation}
+        return {"final_explanation": final_explanation, "why_this_trip_works": final_explanation}

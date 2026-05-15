@@ -2,8 +2,8 @@
 Budget schema: detailed cost breakdown including hidden costs.
 """
 
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, Dict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
+from typing import Optional, Dict, List
 
 
 class BudgetCategory(BaseModel):
@@ -76,11 +76,18 @@ class BudgetBreakdown(BaseModel):
     total_hidden_costs: float = Field(default=0, ge=0, description="Sum of hidden costs per person")
     total_per_person: float = Field(default=0, ge=0, description="Total per person (base + hidden)")
     total_for_group: float = Field(default=0, ge=0, description="Total for all travelers")
+    total_estimated_cost: float = Field(default=0, ge=0, description="Total estimated cost for the group")
+    per_person_cost: float = Field(default=0, ge=0, description="Total estimated cost per person")
+    budget_limit: Optional[float] = Field(None, ge=0, description="Budget limit per person, if supplied")
+    base_costs: Dict[str, float] = Field(default_factory=dict, description="Base cost categories")
+    hidden_costs: Dict[str, float] = Field(default_factory=dict, description="Hidden cost categories")
     
     # Validation
     user_budget_per_person: Optional[float] = Field(None, ge=0, description="User's stated budget per person")
     is_over_budget: bool = Field(default=False, description="True if total exceeds user budget")
     budget_remaining_per_person: Optional[float] = Field(None, description="Budget remaining per person")
+    status: str = Field(default="unknown", description="Budget status: unknown, within_budget, or over_budget")
+    warnings: List[str] = Field(default_factory=list, description="Budget warnings")
     
     breakdown_detail: Optional[Dict[str, BudgetCategory]] = Field(
         None,
@@ -88,4 +95,29 @@ class BudgetBreakdown(BaseModel):
     )
     
     notes: Optional[str] = Field(None, description="Budget notes and assumptions")
+
+    @model_validator(mode="after")
+    def normalize_budget_status(self) -> "BudgetBreakdown":
+        """Keep budget status derived from the canonical is_over_budget field."""
+        per_person = self.per_person_cost or self.total_per_person
+        budget_limit = self.budget_limit if self.budget_limit is not None else self.user_budget_per_person
+
+        if self.per_person_cost == 0 and per_person:
+            self.per_person_cost = per_person
+        if self.total_per_person == 0 and per_person:
+            self.total_per_person = per_person
+        if self.budget_limit is None and budget_limit is not None:
+            self.budget_limit = budget_limit
+        if self.user_budget_per_person is None and budget_limit is not None:
+            self.user_budget_per_person = budget_limit
+
+        if budget_limit is None:
+            self.is_over_budget = bool(self.is_over_budget)
+            self.status = "over_budget" if self.is_over_budget else "unknown"
+            return self
+
+        self.is_over_budget = bool(per_person > budget_limit)
+        self.budget_remaining_per_person = budget_limit - per_person
+        self.status = "over_budget" if self.is_over_budget else "within_budget"
+        return self
     

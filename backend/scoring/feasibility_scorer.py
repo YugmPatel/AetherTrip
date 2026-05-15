@@ -53,6 +53,35 @@ class FeasibilityScorer:
             itinerary = Itinerary(**itinerary)
         if isinstance(budget_report, dict):
             budget_report = BudgetBreakdown(**budget_report)
+        validation_reports = [
+            report if isinstance(report, ValidationReport) else ValidationReport(**report)
+            for report in (validation_reports or [])
+        ]
+        item_count = sum(len(day.items or []) for day in itinerary.days or [])
+        if not itinerary.days or item_count == 0:
+            warnings = ["No itinerary items generated."]
+            return FeasibilityScore(
+                overall_score=25,
+                grade="F",
+                breakdown={
+                    "opening_hours": 0,
+                    "travel_time": 0,
+                    "budget": self._score_budget(budget_report),
+                    "source_confidence": 0,
+                    "constraint_satisfaction": 0,
+                    "weather_risk": 0,
+                    "repair_stability": self._score_repair_stability(repair_attempts),
+                },
+                weights=WEIGHTS,
+                generated_at=datetime.utcnow().isoformat() + "Z",
+                explanation="Itinerary generation failed because no itinerary items were generated.",
+                warnings=warnings,
+                detailed_notes={
+                    "itinerary": "No itinerary items generated.",
+                    "source_confidence": "No itinerary items were available for source verification.",
+                    "travel_time": "No route can be validated without itinerary items.",
+                },
+            )
         
         # Score each component (0-100)
         breakdown = {
@@ -108,7 +137,7 @@ class FeasibilityScorer:
                          f"Route segments feasible with travel buffers.",
             "budget": f"Score: {breakdown['budget']}/100 – "
                     f"Total ${budget_report.total_per_person:.2f}/person, "
-                    f"{'under' if not budget_report.is_over_budget else 'over'} budget.",
+                    f"{self._budget_status_text(budget_report)}.",
             "source_confidence": f"Score: {breakdown['source_confidence']}/100 – "
                                f"Average confidence {breakdown['source_confidence']:.0%}.",
             "constraint_satisfaction": f"Score: {breakdown['constraint_satisfaction']}/100 – "
@@ -201,7 +230,6 @@ class FeasibilityScorer:
         """
         if not budget_report.user_budget_per_person:
             return 100  # No budget constraint
-        
         budget = budget_report.user_budget_per_person
         actual = budget_report.total_per_person
         
@@ -211,8 +239,10 @@ class FeasibilityScorer:
             return 80   # Tight but OK
         elif actual <= budget * 1.10:
             return 50   # 1-10% over
+        elif actual <= budget * 1.25:
+            return 20   # materially over, but potentially adjustable
         else:
-            return 0    # >10% over
+            return 0    # >25% over: likely infeasible as requested
     
     def _score_source_confidence(self, itinerary: Itinerary) -> int:
         """
@@ -306,7 +336,15 @@ class FeasibilityScorer:
     ) -> str:
         """Generate human-friendly explanation of score."""
         
-        if grade in ["A", "B"]:
+        if (
+            budget_report.is_over_budget
+            and budget_report.user_budget_per_person
+            and budget_report.total_per_person > budget_report.user_budget_per_person * 1.25
+        ):
+            opening = f"This trip is not feasible as requested (Grade {grade})."
+        elif breakdown["travel_time"] == 0:
+            opening = f"This trip needs review because some travel segments remain impossible (Grade {grade})."
+        elif grade in ["A", "B"]:
             opening = f"This trip is well-planned (Grade {grade})."
         elif grade == "C":
             opening = f"This trip is feasible but has some concerns (Grade {grade})."
@@ -317,9 +355,9 @@ class FeasibilityScorer:
         
         # Opening hours
         if breakdown["opening_hours"] == 100:
-            key_points.append("All attractions are verified open at scheduled times.")
+            key_points.append("No opening-hour conflicts were returned.")
         elif breakdown["opening_hours"] >= 80:
-            key_points.append("Opening hours mostly verified; minor timing conflicts.")
+            key_points.append("Some opening hours are unknown or need manual verification.")
         else:
             key_points.append("Opening hours have conflicts that need attention.")
         
@@ -332,12 +370,16 @@ class FeasibilityScorer:
             key_points.append("Some travel segments are impossible with current timing.")
         
         # Budget
-        if not budget_report.is_over_budget:
+        if budget_report.status == "unknown":
+            key_points.append("Budget limit is missing or cost estimates are incomplete.")
+        elif not budget_report.is_over_budget:
             remaining = budget_report.budget_remaining_per_person or 0
             key_points.append(f"Cost is within budget: ${budget_report.total_per_person:.0f}/person, "
                             f"${remaining:.0f} remaining.")
         else:
-            overage = budget_report.total_per_person - budget_report.user_budget_per_person
+            overage = budget_report.total_per_person - (budget_report.user_budget_per_person or 0)
+            if budget_report.user_budget_per_person and budget_report.total_per_person > budget_report.user_budget_per_person * 1.25:
+                key_points.append("Trip is not feasible within the requested budget.")
             key_points.append(f"Cost exceeds budget by ${overage:.0f}/person.")
         
         # Source confidence
@@ -359,11 +401,16 @@ class FeasibilityScorer:
         """Collect key warnings for the user."""
         warnings = []
         
-        if breakdown["travel_time"] < 100:
+        if breakdown["travel_time"] == 0:
+            warnings.append("Some travel segments remain impossible with the current timing.")
+        elif breakdown["travel_time"] < 100:
             warnings.append("Some travel segments are tight; allow flexibility.")
         
         if budget_report.is_over_budget:
-            warnings.append("Trip exceeds budget; consider reducing activities.")
+            if budget_report.user_budget_per_person and budget_report.total_per_person > budget_report.user_budget_per_person * 1.25:
+                warnings.append("Trip is not feasible within the requested budget.")
+            else:
+                warnings.append("Trip exceeds budget; consider reducing activities.")
         elif budget_report.budget_remaining_per_person and budget_report.budget_remaining_per_person < 50:
             warnings.append("Limited buffer remaining in budget.")
         
@@ -374,3 +421,12 @@ class FeasibilityScorer:
             warnings.append("Weather may impact outdoor activities.")
         
         return warnings
+
+    def _budget_status_text(self, budget_report: BudgetBreakdown) -> str:
+        if budget_report.status == "unknown":
+            return "budget status unknown"
+        if budget_report.is_over_budget:
+            if budget_report.user_budget_per_person and budget_report.total_per_person > budget_report.user_budget_per_person * 1.25:
+                return "not feasible as requested"
+            return "over budget"
+        return "under budget"

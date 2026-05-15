@@ -90,3 +90,15 @@ def test_source_confidence_influence(sample_places):
 
     score = scorer.score(itin, [], budget, repair_attempts=0)
     assert score.breakdown["source_confidence"] == 0
+
+
+def test_empty_itinerary_score_is_not_high(sample_places):
+    verification = VerificationValidator(sample_places)
+    scorer = FeasibilityScorer(verification)
+    itin = Itinerary(destination="X", days=[], total_estimated_cost_per_person=0)
+    budget = BudgetBreakdown(is_over_budget=False)
+
+    score = scorer.score(itin, [], budget, repair_attempts=0)
+
+    assert score.overall_score <= 30
+    assert "No itinerary items generated." in score.warnings

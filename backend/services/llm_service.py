@@ -42,6 +42,7 @@ class LLMService:
         prompt: str,
         system_instruction: Optional[str] = None,
         model: Optional[str] = None,
+        response_format: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Call OpenRouter API (OpenAI-compatible).
@@ -55,12 +56,18 @@ class LLMService:
             Response text
         """
         if not config.OPENROUTER_API_KEY:
-            logger.warning("OpenRouter API key not set; falling back to Ollama")
+            logger.warning(
+                "OpenRouter LLM call failed provider=openrouter endpoint=chat status=missing_api_key fallback_used=true"
+            )
             return LLMService.call_ollama(prompt, system_instruction)
         
         model = model or config.OPENROUTER_MODEL
         
         try:
+            logger.info(
+                "OpenRouter LLM call started provider=openrouter endpoint=chat model=%s fallback_used=false",
+                model,
+            )
             client = OpenAI(
                 api_key=config.OPENROUTER_API_KEY,
                 base_url=config.OPENROUTER_BASE_URL,
@@ -71,23 +78,43 @@ class LLMService:
                 messages.append({"role": "system", "content": system_instruction})
             messages.append({"role": "user", "content": prompt})
             
-            response = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=0.7,
-                max_tokens=2000,
-            )
+            request_kwargs = {
+                "model": model,
+                "messages": messages,
+                "temperature": 0.7,
+                "max_tokens": 2000,
+            }
+            if response_format:
+                request_kwargs["response_format"] = response_format
+
+            response = client.chat.completions.create(**request_kwargs)
             
             text = response.choices[0].message.content
-            logger.info(f"OpenRouter call succeeded (model: {model})")
+            logger.info(
+                "OpenRouter LLM call succeeded provider=openrouter endpoint=chat model=%s fallback_used=false",
+                model,
+            )
             return text
         
         except RateLimitError as e:
-            logger.warning(f"OpenRouter rate limited: {e}")
+            logger.warning(
+                "OpenRouter LLM call failed provider=openrouter endpoint=chat model=%s error_type=rate_limit fallback_used=true",
+                model,
+            )
             return LLMService.call_ollama(prompt, system_instruction)
         
         except APIError as e:
-            logger.error(f"OpenRouter API error: {e}")
+            logger.error(
+                "OpenRouter LLM call failed provider=openrouter endpoint=chat model=%s error_type=api_error fallback_used=true",
+                model,
+            )
+            return LLMService.call_ollama(prompt, system_instruction)
+
+        except Exception:
+            logger.exception(
+                "OpenRouter LLM call failed provider=openrouter endpoint=chat model=%s error_type=unexpected fallback_used=true",
+                model,
+            )
             return LLMService.call_ollama(prompt, system_instruction)
     
     @staticmethod
@@ -110,6 +137,10 @@ class LLMService:
         model = model or config.OLLAMA_MODEL
         
         try:
+            logger.info(
+                "Ollama LLM fallback call started provider=ollama endpoint=chat model=%s fallback_used=true",
+                model,
+            )
             client = OpenAI(
                 api_key="ollama",
                 base_url=config.OLLAMA_BASE_URL,
@@ -127,11 +158,17 @@ class LLMService:
             )
             
             text = response.choices[0].message.content
-            logger.info(f"Ollama call succeeded (model: {model})")
+            logger.info(
+                "Ollama LLM fallback call succeeded provider=ollama endpoint=chat model=%s fallback_used=true",
+                model,
+            )
             return text
         
         except Exception as e:
-            logger.error(f"Ollama call failed: {e}")
+            logger.error(
+                "Ollama LLM fallback call failed provider=ollama endpoint=chat model=%s fallback_used=true",
+                model,
+            )
             return LLMService._mock_response(prompt)
     
     @staticmethod
